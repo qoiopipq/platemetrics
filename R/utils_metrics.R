@@ -4,7 +4,7 @@
 #'@import tibble
 
 
-get_median_metrics <- function (metadata = NULL,
+get_plate_median_metrics <- function (metadata = NULL,
                                 metrics = "nFeature_RNA",
                                 group_by = "Treatment_1",
                                 controls = c("^DMSO|^Media|^Staurosporine|^Untreated"),
@@ -72,11 +72,60 @@ get_median_metrics <- function (metadata = NULL,
   median_metrics <- median_metrics %>%
     select(Sample, everything())
 
-  # For each cell type if Cell_type column contains multiple cell types
-  if (length(unique(metadata$Cell_type))==1) {
-    median_metrics$Cell_type <- unique(metadata$Cell_type)
-  } else {
-    median_metrics$Cell_type <- paste(unique(metadata$Cell_type), collapse = ", ")
-  }
   return (median_metrics)
 }
+
+
+
+
+
+
+#' Get median metrics for all cell types in a plate
+#'
+#' @import dplyr
+#' @import tibble
+
+get_celltypes_medain_metrics <-  function (metadata = NULL,
+                                           metrics = "nFeature_RNA",
+                                           group_by = "Treatment_1",
+                                           controls = c("^DMSO|^Media|^Staurosporine|^Untreated"),
+                                           Model_type = NULL){
+  # Check if metadata is a data frame
+  if (!is.data.frame(metadata)) {
+    stop("Metadata must be a data frame.")
+  }
+  # Check if metrics is a character vector
+  if (!is.character(metrics) | !(metrics %in% c("nFeature_RNA", "nCount_RNA"))) {
+    stop("Metrics must be a character vector. It is either nFeature_RNA or nCount_RNA.")
+  }
+  # Check if group_by is NULL
+  if (is.null(group_by)) { group_by <- "Treatment_1" }
+  # Check if group_by is in the columns in metadata
+  if (is.null(metadata[[group_by]])) {
+    stop(paste("Group_by", group_by, "is not a column in metadata."))
+  }
+  # Check if controls is a character vector
+  if (!is.character(controls)) {
+    stop("Controls must be a character vector.")
+  }
+  # Check model type if it is one of three types
+  if (is.null(Model_type) | !Model_type %in% c("2D_non_adherent", "2D_adherent", "3D")){
+    stop("Model_type must be one of '2D_non_adherent', '2D_adherent', or '3D'.")
+  }
+  # filter cell type if it is empty
+  cell_type_metadata <- metadata %>%
+    filter(!is.na(Cell_type) | Cell_type != "" | Cell_type != "EMPTY")
+  if(length(unique(cell_type_metadata$Cell_type)) == 1){
+    cell_type_metadata <- get_plate_median_metrics(metadata = metadata,
+                                                   metrics = metrics,
+                                                   group_by = group_by,
+                                                   controls = controls,
+                                                   Model_type = Model_type)
+    cell_type_metadata$Cell_type <- unique(metadata$Cell_type)
+  }
+
+  return(cell_type_metadata)
+
+}
+
+
