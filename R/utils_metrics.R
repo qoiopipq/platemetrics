@@ -1,4 +1,6 @@
+utils::globalVariables(c("Cell_type", "Sample", "Treatment_1", "Sample"))
 #' Compute median metrics by control groups
+#'
 #' @param metadata The metadata data frame with nCount_RNA, nFeature_RNA, orig.ident columns, and metadata information.
 #' This metadata should be able to get from Seurat object.
 #' @param metrics The metrics to compute median for. It can be either "nFeature_RNA" or "nCount_RNA".
@@ -6,11 +8,13 @@
 #' @param controls A character vector of control group names to filter by.
 #' Default is c("^DMSO|^Media|^Staurosporine|^Untreated").
 #' @param Model_type The model type of the plate. It can be either "2D_non_adherent", "2D_adherent", or "3D".
-#'@import dplyr
-#'@import tibble
-#'
-
-
+#' @import dplyr
+#' @import tibble
+#' @import tidyr
+#' @import Seurat
+#' @importFrom stringr str_replace
+#' @importFrom stats median
+#' @return A data frame with median metrics for each control group for entire plate.
 get_plate_median_metrics <- function (metadata = NULL,
                                 metrics = "nFeature_RNA",
                                 group_by = "Treatment_1",
@@ -111,8 +115,8 @@ get_plate_median_metrics <- function (metadata = NULL,
 #' @param Model_type The model type of the plate. It can be either "2D_non_adherent", "2D_adherent", or "3D".
 #' @import dplyr
 #' @import tibble
-
-get_celltypes_medain_metrics <-  function (metadata = NULL,
+#' @return A data frame with median metrics for each control group for each cell type.
+get_celltypes_medain_metrics <- function (metadata = NULL,
                                            metrics = "nFeature_RNA",
                                            group_by = "Treatment_1",
                                            controls = c("^DMSO|^Media|^Staurosporine|^Untreated"),
