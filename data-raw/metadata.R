@@ -1,6 +1,8 @@
 ## code to prepare `metadata` dataset goes here
 
 usethis::use_data(metadata, overwrite = TRUE)
+library(SeuratObject)
+library(Seurat)
 
 metadata <- read.csv("/Users/liuxin/Documents/MACseq/macpie/macpieData_backup/extdata/PMMSq033/PMMSq033_metadata_drugnames.csv")
 metadata$X <- NULL
