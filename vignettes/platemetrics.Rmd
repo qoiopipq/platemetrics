@@ -1,0 +1,97 @@
+---
+title: "platemetrics"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{platemetrics}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r set_wd, include = FALSE}
+dir <- "/Users/liuxin/platemetrics/"
+devtools::load_all(dir)
+```
+
+```{r setup}
+library(platemetrics)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+
+```
+
+Set paths
+
+```{r}
+# point these at your actual paths
+qc_dir     <- "/Volumes/bioinf/team_folders/MGC_VCFG/macseq/results"
+proj_dir   <- "/Users/liuxin/Documents/MACseq/Projects"
+cutoff     <- as.POSIXct("2025-03-07")
+
+```
+
+Set renaming samples
+
+```{r}
+# optional renaming map
+rename_map <- c(
+  "PMMSq043" = "HR_PMMSq043", "PMMSq044" = "HR_PMMSq044", "PMMSq045" = "HR_PMMSq045",
+  "PMMSq040" = "KP_PMMSq040", "PMMSq041" = "ML_PMMSq041", "PMMSq042" = "SA_PMMSq042",
+  "PMMSq046" = "SR_PMMSq046", "PMMSq047" = "SR_PMMSq047", "PMMSq048" = "SR_PMMSq048",
+  "PMMSq049" = "SR_PMMSq049"
+)
+```
+
+## Get the sequencing QC metrics
+
+Based on `get_recent_files` and `format_multiqc_stats` functions, we can get the recent QC files and format them.
+
+By setting `cutoff` to a specific date, you can filter the files modified after that date. The `rename_map` allows you to rename samples for better readability.
+
+Manually exclude some mapping outputs for other purposes. 
+
+```{r}
+recent_qc <- get_recent_files(qc_dir, "multiqc_general_stats.txt", cutoff)
+recent_qc <-recent_qc[grep("PMMSq040_174132776|PMMSq029_1747700619|PMMSq040_1747632181|AK_PMMSq041_1744279814|PMMSq042_1744692226|PMMSq033_1747610300|PMMSq033_1747633313|6199_6199_1749708215", recent_qc, invert = TRUE)]
+
+
+qc_meta <- format_multiqc_stats(recent_qc, rename_map)
+qc_meta
+
+
+```
+
+## Get the gene QC metrics - plate level
+
+```{r}
+plate_gene_meta <- read_metrics(path = proj_dir, pattern = "*median_genes.csv", date = cutoff, plate = TRUE)
+plate_gene_meta
+
+```
+
+## Get the UMI QC metrics - plate level
+
+```{r}
+plate_umi_meta <- read_metrics(path = proj_dir, pattern = "*median_counts.csv", date = cutoff, plate = TRUE)
+plate_umi_meta 
+```
+## Get the gene QC metrics - cell type level
+
+```{r}
+ct_gene_meta <- read_metrics(path = proj_dir, pattern = "*median_genes.csv", date = cutoff, plate = FALSE)
+ct_gene_meta
+```
+
+## Get the UMI QC metrics - cell type level
+
+```{r}
+ct_umi_meta <- read_metrics(path = proj_dir, pattern = "*median_counts.csv", date = cutoff, plate = FALSE)
+ct_umi_meta
+```
