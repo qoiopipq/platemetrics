@@ -5,6 +5,7 @@
 #' only getting files with mtime > date
 #' @import dplyr
 #' @import stringr
+#' @import readr
 #' @return A character vector of file paths that match the pattern and are modified after the specified date
 #' @examples
 #' path <- "/Volumes/bioinf/team_folders/MGC_VCFG/macseq/results"
@@ -43,7 +44,7 @@ get_recent_files <- function(path,
 #' @import stringr
 #' @import dplyr
 
-# recent_files<-recent_files[grep("PMMSq040_174132776|PMMSq029_1747700619|PMMSq040_1747632181|AK_PMMSq041_1744279814|PMMSq042_1744692226|PMMSq033_1747610300|PMMSq033_1747633313|6199_6199_1749708215", recent_files, invert = TRUE)]
+# recent_qc<-recent_qc[grep("PMMSq040_174132776|PMMSq029_1747700619|PMMSq040_1747632181|AK_PMMSq041_1744279814|PMMSq042_1744692226|PMMSq033_1747610300|PMMSq033_1747633313|6199_6199_1749708215", recent_files, invert = TRUE)]
 
 format_multiqc_stats <- function(recent_files,
                                  rename_map = NULL){
@@ -55,10 +56,12 @@ format_multiqc_stats <- function(recent_files,
   if (!is.null(rename_map) && !is.character(rename_map)) {
     stop("rename_map must be a character vector or NULL.")
   }
-  df_list <- lapply(recent_files, \(f) read.csv(f, sep = "\t", stringsAsFactors = FALSE))
+  # df_list <- lapply(recent_files, \(f) read_delim(f, delim = "\t", show_col_types = FALSE))
+  df_list <- lapply(recent_qc, \(f) read_delim(f, delim = "\t", show_col_types = FALSE))
   qc_meta <- bind_rows(df_list)
   # Rename samples by removing "-null" suffix
   qc_meta$Sample<-str_replace(qc_meta$Sample,"-null","")
+  colnames(qc_meta) <- str_replace_all(colnames(qc_meta), "-", "_")
   # Rename samples based on rename_map if provided
   if(!is.null(rename_map)){
     if (!all(names(rename_map) %in% qc_meta$Sample)) {
@@ -70,15 +73,17 @@ format_multiqc_stats <- function(recent_files,
   # Get R2 sequencing QC stats from each sample
   r2_stats <- qc_meta %>%
     filter(str_detect(Sample, "[0-9]_2$")) %>%
-    transmute(Sample = str_replace(Sample, "_2$", ""),
-              duplication_percent = FastQC_mqc.generalstats.fastqc.percent_duplicates,
-              total_reads = FastQC_mqc.generalstats.fastqc.total_sequences)
+    mutate(Sample = str_replace(Sample, "_2$", ""),
+              duplication_percent = FastQC_mqc_generalstats_fastqc_percent_duplicates,
+              total_reads = FastQC_mqc_generalstats_fastqc_total_sequences,
+           .keep = "none")
   # Get rows that Sample is not _1 or _2
   # Join with r2_stats
   sample_stats <- qc_meta %>%
     filter(!str_detect(Sample, "_[12]$")) %>%
-    transmute(Sample = Sample,
-              uniquely_mapped_percent = STAR_mqc.generalstats.star.uniquely_mapped_percent) %>%
+    mutate(Sample = Sample,
+              uniquely_mapped_percent = STAR_mqc_generalstats_star_uniquely_mapped_percent,
+           .keep = "none") %>%
     left_join(r2_stats, by = "Sample")
   return(sample_stats)
 }

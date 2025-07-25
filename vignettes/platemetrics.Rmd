@@ -1,0 +1,402 @@
+---
+title: "platemetrics"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{platemetrics}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r set_wd, include = FALSE}
+dir <- "/Users/liuxin/platemetrics/"
+devtools::load_all(dir)
+```
+
+```{r setup}
+library(platemetrics)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(ggiraph)
+library(DT)
+
+```
+
+Set paths
+
+```{r}
+# point these at your actual paths
+qc_dir     <- "/Volumes/bioinf/team_folders/MGC_VCFG/macseq/results"
+proj_dir   <- "/Users/liuxin/Documents/MACseq/Projects"
+cutoff     <- as.POSIXct("2025-03-07")
+
+```
+
+Set renaming samples
+
+```{r}
+# optional renaming map
+rename_map <- c(
+  "PMMSq043" = "HR_PMMSq043", "PMMSq044" = "HR_PMMSq044", "PMMSq045" = "HR_PMMSq045",
+  "PMMSq040" = "KP_PMMSq040", "PMMSq041" = "ML_PMMSq041", "PMMSq042" = "SA_PMMSq042",
+  "PMMSq046" = "SR_PMMSq046", "PMMSq047" = "SR_PMMSq047", "PMMSq048" = "SR_PMMSq048",
+  "PMMSq049" = "SR_PMMSq049"
+)
+```
+
+## Get the sequencing QC metrics
+
+Based on `get_recent_files` and `format_multiqc_stats` functions, we can get the recent QC files and format them.
+
+By setting `cutoff` to a specific date, you can filter the files modified after that date. The `rename_map` allows you to rename samples for better readability.
+
+Manually exclude some mapping outputs for other purposes. 
+
+```{r}
+recent_qc <- get_recent_files(qc_dir, "multiqc_general_stats.txt", cutoff)
+recent_qc <-recent_qc[grep("PMMSq040_174132776|PMMSq029_1747700619|PMMSq040_1747632181|AK_PMMSq041_1744279814|PMMSq042_1744692226|PMMSq033_1747610300|PMMSq033_1747633313|6199_6199_1749708215", recent_qc, invert = TRUE)]
+
+
+qc_meta <- format_multiqc_stats(recent_qc, rename_map)
+#round 
+qc_meta$duplication_percent <- round(qc_meta$duplication_percent, 2)
+qc_meta
+
+
+```
+
+```{r, include=FALSE}
+htmltools::tagList(datatable(cars,
+  extensions = c("Buttons"),
+  options = list(dom = "Blrtip",
+                 buttons = list(
+                   list(extend = "csv", filename = "initialise"),
+                   list(extend = "excel", filename = "initialise")))
+))
+```
+
+```{r}
+print(htmltools::tagList(
+  datatable(qc_meta,
+            extensions = c("Buttons"),
+            options = list(dom = "Blrtip",
+                           buttons = list(
+                             list(extend = "csv", filename = "initialise"),
+                             list(extend = "excel", filename = "initialise")))
+  )
+))
+```
+
+<!-- # ```{r} -->
+<!-- # # Convert the data to long format for plotting -->
+<!-- # qc_meta_long <- tidyr::pivot_longer(qc_meta,   -->
+<!-- #                                     cols = -Sample, -->
+<!-- #                                     names_to = "metric",  -->
+<!-- #                                     values_to = "value") -->
+<!-- # ``` -->
+
+
+
+
+## Get the gene QC metrics - plate level
+
+```{r}
+plate_gene_meta <- read_metrics(path = proj_dir, pattern = "*median_genes.csv", date = cutoff, plate = TRUE)
+plate_gene_meta
+
+```
+
+## Get the UMI QC metrics - plate level
+
+```{r}
+plate_umi_meta <- read_metrics(path = proj_dir, pattern = "*median_counts.csv", date = cutoff, plate = TRUE)
+plate_umi_meta 
+```
+## Get the gene QC metrics - cell type level
+
+```{r}
+ct_gene_meta <- read_metrics(path = proj_dir, pattern = "*median_genes.csv", date = cutoff, plate = FALSE)
+ct_gene_meta
+```
+
+## Get the UMI QC metrics - cell type level
+
+```{r}
+ct_umi_meta <- read_metrics(path = proj_dir, pattern = "*median_counts.csv", date = cutoff, plate = FALSE)
+ct_umi_meta
+```
+
+
+## Load metrics data of 2024
+
+```{r}
+plate_gene_meta_2024 <- read.csv("/Users/liuxin/Documents/MACseq/Projects/VCFG/2024MACseq_SequencingQC/SequencingQC_PlatesGenesMapping_2024.csv", row.names = 1)
+
+plate_umi_meta_2024 <- read.csv("/Users/liuxin/Documents/MACseq/Projects/VCFG/2024MACseq_SequencingQC/SequencingQC_PlatesUMIs_2024.csv", row.names = 1)
+
+ct_gene_meta_2024 <- read.csv("/Users/liuxin/Documents/MACseq/Projects/VCFG/2024MACseq_SequencingQC/SequencingQC_CelllinesGenes_2024.csv", row.names = 1)
+
+ct_umi_meta_2024 <- read.csv("/Users/liuxin/Documents/MACseq/Projects/VCFG/2024MACseq_SequencingQC/SequencingQC_CelllinesUMIs_2024.csv", row.names = 1)
+
+```
+
+```{r}
+plate_meta_2024 <- plate_gene_meta_2024 %>%
+  select(everything()) %>%
+  left_join(plate_umi_meta_2024, by = c("Sample","Org_Cell")) %>%
+  mutate(year = "2024") %>%
+  select(Sample, Org_Cell, uniquely_mapped_percent, duplication_percent, total_reads,
+         Overall_median_genes, Overall_median_counts, everything())
+```
+
+
+```{r}
+ct_meta_2024 <- ct_gene_meta_2024 %>%
+  left_join(ct_umi_meta_2024, by = c("Sample","Org_Cell", "Cell_type")) %>%
+  mutate(year = "2024") %>%
+  select(Sample, Org_Cell, Cell_type, Overall_median_genes, Overall_median_counts,  everything())
+```
+
+
+
+## Plate level metrics
+
+This contains sequencing QC, gene number and UMI number for each plate.
+
+```{r}
+plate_meta <- qc_meta %>%
+  select(everything()) %>%
+  left_join(plate_gene_meta, by = "Sample") %>%
+  left_join(plate_umi_meta, by = c("Sample","Org_Cell")) %>%
+  mutate(year = format(Sys.Date(),"%Y")) %>%
+  select(Sample, Org_Cell, uniquely_mapped_percent, duplication_percent, total_reads,
+         Overall_median_genes, Overall_median_counts, everything())
+
+```
+
+Combine with 2024 data
+
+```{r}
+final_plate_meta <- plate_meta %>%
+  bind_rows(plate_meta_2024) %>%
+  arrange(Sample, Org_Cell)
+```
+
+
+```{r}
+print(htmltools::tagList(
+  datatable(final_plate_meta,
+            extensions = c("Buttons"),
+            options = list(dom = "Blrtip",
+                           buttons = list(
+                             list(extend = "csv", filename = "initialise"),
+                             list(extend = "excel", filename = "initialise")))
+  )
+))
+```
+
+Exclude plates with Org_Cell as RNA, 2D_3D, and 3D_co_culture&suspension for plotting in the barplots 
+
+```{r}
+final_plate_meta_plot <- final_plate_meta %>%
+  filter(!Org_Cell %in% c("RNA", "2D_3D", "3D_co_culture&suspension"))
+```
+
+
+### Sequence QC plot
+
+
+```{r}
+p <- final_plate_meta_plot %>% select (Sample, Org_Cell, uniquely_mapped_percent, duplication_percent) %>%
+  pivot_longer(.,
+               cols = c(uniquely_mapped_percent, duplication_percent),
+               names_to = "metric",
+               values_to = "value") %>%
+  ggplot(aes(x = metric, y = value, fill = Org_Cell)) + geom_boxplot(position = position_dodge(width = 0.6),
+    width = 0.6,outliers = F) +
+  geom_jitter_interactive(aes(tooltip = paste(Sample,": ", value, "%"), color= Org_Cell),position = position_jitterdodge(dodge.width  = 0.5,
+      jitter.width = 0.2,
+      jitter.height = 0), size = 2, alpha = 0.8) +
+  theme_minimal() + labs(x = "Mapping rates", y = "Percent (%)") 
+girafe(ggobj = p, width_svg = 7, height_svg = 5,
+        options = list(
+          opts_tooltip(css = "background-color: #f0f0f0; color: black; padding: 5px; border-radius: 5px;"),
+          opts_hover(css = "fill-opacity: 0.8; stroke-width: 1.5;")
+        ))
+
+```
+
+
+
+### Gene number plot
+
+```{r}
+p <- final_plate_meta_plot %>% select(Sample, Org_Cell, contains("genes")) %>% 
+  pivot_longer(.,
+               cols = contains("genes"),
+               names_to = "metric",
+               values_to = "value") %>%
+  # remove '_median_genes' in column metric
+  mutate(metric = factor(str_replace(metric, "_median_genes", ""), levels=c("Overall","DMSO","Media","STAURO", "Mock", "Untreated", "siOTP","siPLK"))) %>%
+  ggplot(aes(x = metric, y = value, fill = Org_Cell)) + geom_boxplot(position = position_dodge(width = 0.6),
+    width = 0.6,outliers = F) +
+  geom_jitter_interactive(aes(tooltip = paste(Sample,": ", value), color= Org_Cell),position = position_jitterdodge(dodge.width  = 0.5,
+      jitter.width = 0.2,
+      jitter.height = 0), size = 2, alpha = 0.8) +
+  theme_minimal() + labs(x = "Controls", y = "Median number of genes") 
+
+girafe(ggobj = p, width_svg = 7, height_svg = 5,
+        options = list(
+          opts_tooltip(css = "background-color: #f0f0f0; color: black; padding: 5px; border-radius: 5px;"),
+          opts_hover(css = "fill-opacity: 0.8; stroke-width: 1.5;")
+        ))
+```
+
+### UMI count plot
+
+```{r}
+p <- final_plate_meta_plot %>% select(Sample, Org_Cell, contains("counts")) %>% 
+  pivot_longer(.,
+               cols = contains("counts"),
+               names_to = "metric",
+               values_to = "value") %>%
+  # remove '_median_counts' in column metric
+  mutate(metric = factor(str_replace(metric, "_median_counts", ""), levels=c("Overall","DMSO","Media","STAURO", "Mock", "Untreated", "siOTP","siPLK"))) %>%
+  ggplot(aes(x = metric, y = value, fill = Org_Cell)) + geom_boxplot(position = position_dodge(width = 0.6),
+    width = 0.6,outliers = F) +
+  geom_jitter_interactive(aes(tooltip = paste(Sample,": ", value), color= Org_Cell),position = position_jitterdodge(dodge.width  = 0.5,
+      jitter.width = 0.2,
+      jitter.height = 0), size = 2, alpha = 0.8) +
+  theme_minimal() + labs(x = "Controls", y = "Median UMIs") 
+
+girafe(ggobj = p, width_svg = 7, height_svg = 5,
+        options = list(
+          opts_tooltip(css = "background-color: #f0f0f0; color: black; padding: 5px; border-radius: 5px;"),
+          opts_hover(css = "fill-opacity: 0.8; stroke-width: 1.5;")
+        ))
+```
+
+
+### Save it
+
+```{r}
+# fetech current date and paste as the output file name
+current_date <- format(Sys.Date(), "%Y%m%d")
+write.csv(final_plate_meta, file = paste0("/Users/liuxin/Documents/MACseq/Projects/VCFG/2025MACseq_SequencingQC/SequencingQC_platemeta_",current_date,".csv") , row.names = FALSE)
+```
+
+
+## Cell type level metrics
+
+This contains gene number and UMI number for each cell type.
+
+
+```{r}
+ct_meta <- ct_gene_meta %>%
+  left_join(ct_umi_meta, by = c("Sample","Org_Cell", "Cell_type")) %>%
+  mutate(year = format(Sys.Date(),"%Y")) %>%
+  select(Sample, Org_Cell, Cell_type, everything())
+
+```
+
+Combine with 2024 data
+
+
+```{r}
+final_ct_meta <- ct_meta %>%
+  bind_rows(ct_meta_2024) %>%
+  arrange(Sample, Org_Cell, Cell_type)
+```
+
+```{r}
+#clean up Org_Cell suspension or 2D_suspension into 2D_non_adherent
+final_ct_meta <- final_ct_meta %>%
+  mutate(Org_Cell = ifelse(Org_Cell %in% c("suspension", "2D_suspension"), "2D_non_adherent", Org_Cell))
+```
+
+
+```{r}
+print(htmltools::tagList(
+  datatable(final_ct_meta,
+            extensions = c("Buttons"),
+            options = list(dom = "Blrtip",
+                           buttons = list(
+                             list(extend = "csv", filename = "initialise"),
+                             list(extend = "excel", filename = "initialise")))
+  )
+))
+```
+
+Exclude cell types with Org_Cell as RNA, 2D_3D, and 3D_co_culture&suspension for plotting in the barplots 
+
+```{r}
+final_ct_meta_plot <- final_ct_meta %>%
+  filter(!Org_Cell %in% c("RNA", "2D_3D", "3D_co_culture&suspension"))
+```
+
+
+### Gene number plot
+
+```{r}
+p <- final_ct_meta_plot %>% select(Sample, Cell_type, contains("genes")) %>% 
+  pivot_longer(.,
+               cols = contains("genes"),
+               names_to = "metric",
+               values_to = "value") %>%
+  # remove '_median_genes' in column metric
+  mutate(metric = factor(str_replace(metric, "_median_genes", ""), levels=c("Overall","DMSO","Media","STAURO", "Mock", "Untreated", "siOTP","siPLK"))) %>%
+  ggplot(aes(x = metric, y = value, fill = Cell_type)) + geom_boxplot(position = position_dodge(width = 0.6),
+    width = 0.6,outliers = F) +
+  geom_jitter_interactive(aes(tooltip = paste(Sample, "-", Cell_type, ": ", value), color= Cell_type),position = position_jitterdodge(dodge.width  = 0.5,
+      jitter.width = 0.2,
+      jitter.height = 0)) +
+  theme_minimal() + labs(x = "Controls", y = "Median number of genes") 
+
+girafe(ggobj = p, width_svg = 7, height_svg = 5,
+        options = list(
+          opts_tooltip(css = "background-color: #f0f0f0; color: black; padding: 5px; border-radius: 5px;"),
+          opts_hover(css = "fill-opacity: 0.8; stroke-width: 1.5;")
+        ))
+```
+
+
+### UMI count plot
+
+```{r}
+p <- final_ct_meta_plot %>% select(Sample, Cell_type, contains("counts")) %>% 
+  pivot_longer(.,
+               cols = contains("counts"),
+               names_to = "metric",
+               values_to = "value") %>%
+  # remove '_median_counts' in column metric
+  mutate(metric = factor(str_replace(metric, "_median_counts", ""), levels=c("Overall","DMSO","Media","STAURO", "Mock", "Untreated", "siOTP","siPLK"))) %>%
+  ggplot(aes(x = metric, y = value, fill = Cell_type)) + geom_boxplot(position = position_dodge(width = 0.6),
+    width = 0.6,outliers = F) +
+  geom_jitter_interactive(aes(tooltip = paste(Sample, "-", Cell_type, ": ", value), color= Cell_type),position = position_jitterdodge(dodge.width  = 0.5,
+      jitter.width = 0.2,
+      jitter.height = 0)) +
+  theme_minimal() + labs(x = "Controls", y = "Median UMIs") 
+
+girafe(ggobj = p, width_svg = 7, height_svg = 5,
+        options = list(
+          opts_tooltip(css = "background-color: #f0f0f0; color: black; padding: 5px; border-radius: 5px;"),
+          opts_hover(css = "fill-opacity: 0.8; stroke-width: 1.5;")
+        ))
+```
+
+
+## Save it
+
+```{r}
+# fetech current date and paste as the output file name
+current_date <- format(Sys.Date(), "%Y%m%d")
+write.csv(final_ct_meta, file = paste0("/Users/liuxin/Documents/MACseq/Projects/VCFG/2025MACseq_SequencingQC/SequencingQC_celltypemeta_",current_date,".csv") , row.names = FALSE)
+```
+
