@@ -43,7 +43,7 @@ read_metrics <- function(path,
   file_info <- file.info(recent_dirs)
   cutoff <- as.POSIXct(date)
   recent_files <- rownames(file_info)[file_info$mtime > cutoff]
-  if (length(gene_recent) == 0) {
+  if (length(recent_files) == 0) {
     stop("No files found matching the specified pattern and date.")
   }
   # Read and concatenate CSV files
