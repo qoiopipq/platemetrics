@@ -73,7 +73,11 @@ read_metrics <- function(path,
       if (plate) {
         # plate level
         plate_gene_dirs <- grep("*ct_median_counts.csv", recent_files, value = TRUE, invert = TRUE)
-        gene_list <- lapply(plate_gene_dirs, \(f) read.csv(f, sep=","))
+        gene_list <- lapply(plate_gene_dirs, function(f) {
+          df <- read.csv(f, sep = ",")
+          colnames(df) <- str_replace_all(colnames(df), "_counts", "_UMIs")
+          df
+        })
         gene_meta <- bind_rows(gene_list)
         #if there is a X Column, remove X column
         if ("X" %in% colnames(gene_meta)) {
@@ -82,7 +86,11 @@ read_metrics <- function(path,
       } else {
         # cell type level
         ct_gene_dirs <- grep("*ct_median_counts.csv", recent_files, value = TRUE)
-        gene_list <- lapply(ct_gene_dirs, \(f) read.csv(f, sep=","))
+        gene_list <- lapply(ct_gene_dirs, function(f) {
+          df <- read.csv(f, sep = ",")
+          colnames(df) <- str_replace_all(colnames(df), "_counts", "_UMIs")
+          df
+        })
         gene_meta <- bind_rows(gene_list)
         #if there is a X Column, remove X column
         if ("X" %in% colnames(gene_meta)) {
@@ -90,9 +98,14 @@ read_metrics <- function(path,
         }
       }
   }
-  # Reorder coulumns to have Sample as the first column
+
+  # Reorder columns to have Sample as the first column
   if ("Sample" %in% colnames(gene_meta)) {
-    gene_meta <- gene_meta %>% select(Sample, Org_Cell, everything())
+    # rename Org_Cell to Model_Type
+    # if Model_type is NA, replace it with Org_Cell
+    gene_meta$Model_type <- ifelse(is.na(gene_meta$Model_type), gene_meta$Org_Cell, gene_meta$Model_type)
+    gene_meta <- gene_meta %>% select(-Org_Cell)
+    gene_meta <- gene_meta %>% select(Sample, Model_type, everything())
   } else {
     stop("The 'Sample' column is missing in the data.")
   }
