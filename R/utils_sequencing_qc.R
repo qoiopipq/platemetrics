@@ -72,7 +72,7 @@ format_multiqc_stats <- function(recent_files,
   }
   # Get R2 sequencing QC stats from each sample
   r2_stats <- qc_meta %>%
-    filter(str_detect(Sample, "[0-9]_2$")) %>%
+    filter(str_detect(Sample, "[0-9]_2$|.*_demux_2$")) %>%
     mutate(Sample = str_replace(Sample, "_2$", ""),
               duplication_percent = FastQC_mqc_generalstats_fastqc_percent_duplicates,
               total_reads = FastQC_mqc_generalstats_fastqc_total_sequences,
